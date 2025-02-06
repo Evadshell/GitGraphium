@@ -2,15 +2,18 @@
 import { useRef, useCallback, useState, useMemo, useEffect } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 import { Card } from "@/components/ui/card";
-import { X, Folder, FileCode, ZoomIn, ZoomOut, RotateCcw } from "lucide-react";
+import { X, Folder, FileCode, ZoomIn, ZoomOut, RotateCcw, Menu } from "lucide-react"
 import * as THREE from "three";
 import SpriteText from "three-spritetext";
 import { Button } from "@/components/ui/button";
+import ChatInterface from "./ChatInterface";
+import FileTreeSidebar from "./FileTreeSideBar";
 
 const FileTree = () => {
   const fgRef = useRef();
   const [selectedNode, setSelectedNode] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   const initialData = {
     nodes: [
@@ -217,88 +220,104 @@ const FileTree = () => {
   };
 
   return (
-    <div className="flex flex-col gap-4 p-4 h-screen">
-      <Card className="w-full flex-grow bg-gradient-to-br from-slate-900 to-slate-800 relative overflow-hidden">
-        <ForceGraph3D
-          ref={fgRef}
-          graphData={graphData}
-          nodeLabel="name"
-          nodeRelSize={6}
-          nodeOpacity={1}
-          nodeResolution={16}
-          linkWidth={1}
-          linkOpacity={0.5}
-          linkDirectionalParticles={2}
-          linkDirectionalParticleSpeed={0.003}
-          linkDirectionalParticleWidth={2}
-          onNodeClick={handleNodeClick}
-          nodeThreeObject={(node) => {
-            const group = new THREE.Group();
+    <div className="flex h-screen">
+    <FileTreeSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+    <div className="flex flex-col flex-grow">
+      <div className="flex items-center justify-between p-4 bg-slate-800 text-white">
+        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)}>
+          <Menu size={24} />
+        </Button>
+        <h1 className="text-xl font-semibold">3D File Explorer</h1>
+      </div>
+      <div className="flex flex-grow">
+        <div className="w-1/2 p-4">
+          <Card className="w-full h-full bg-gradient-to-br from-slate-900 to-slate-800 relative overflow-hidden">
+            <ForceGraph3D
+              ref={fgRef}
+              graphData={graphData}
+              nodeLabel="name"
+              nodeRelSize={6}
+              nodeOpacity={1}
+              nodeResolution={16}
+              linkWidth={1}
+              linkOpacity={0.5}
+              linkDirectionalParticles={2}
+              linkDirectionalParticleSpeed={0.003}
+              linkDirectionalParticleWidth={2}
+              onNodeClick={handleNodeClick}
+              nodeThreeObject={(node) => {
+                const group = new THREE.Group()
 
-            const sphereGeometry = new THREE.SphereGeometry(node.size || 1);
-            const sphereMaterial = new THREE.MeshPhongMaterial({
-              color: node.color,
-              transparent: true,
-              opacity: 0.85,
-              shininess: 100,
-            });
-            const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial);
-            group.add(sphere);
+                const sphereGeometry = new THREE.SphereGeometry(node.size || 1)
+                const sphereMaterial = new THREE.MeshPhongMaterial({
+                  color: node.color,
+                  transparent: true,
+                  opacity: 0.85,
+                  shininess: 100,
+                })
+                const sphere = new THREE.Mesh(sphereGeometry, sphereMaterial)
+                group.add(sphere)
 
-            const sprite = new SpriteText(node.name);
-            sprite.color = "#ffffff";
-            sprite.backgroundColor = "rgba(0,0,0,0.2)";
-            sprite.padding = 2;
-            sprite.textHeight = 8;
-            sprite.position.y = node.size * 1.5 || 1.5;
-            group.add(sprite);
+                const sprite = new SpriteText(node.name)
+                sprite.color = "#ffffff"
+                sprite.backgroundColor = "rgba(0,0,0,0.2)"
+                sprite.padding = 2
+                sprite.textHeight = 8
+                sprite.position.y = node.size * 1.5 || 1.5
+                group.add(sprite)
 
-            return group;
-          }}
-          backgroundColor="#0F172A"
-          width={dimensions.width - 32}
-          height={dimensions.height - 32}
-        />
+                return group
+              }}
+              backgroundColor="#0F172A"
+              width={dimensions.width / 2 - 32}
+              height={dimensions.height - 100}
+            />
 
-        <div className="absolute top-4 left-4 flex space-x-2">
-          <Button variant="secondary" size="icon" onClick={handleZoomIn}>
-            <ZoomIn size={18} />
-          </Button>
-          <Button variant="secondary" size="icon" onClick={handleZoomOut}>
-            <ZoomOut size={18} />
-          </Button>
-          <Button variant="secondary" size="icon" onClick={handleReset}>
-            <RotateCcw size={18} />
-          </Button>
+            <div className="absolute top-4 left-4 flex space-x-2">
+              <Button variant="secondary" size="icon" onClick={handleZoomIn}>
+                <ZoomIn size={18} />
+              </Button>
+              <Button variant="secondary" size="icon" onClick={handleZoomOut}>
+                <ZoomOut size={18} />
+              </Button>
+              <Button variant="secondary" size="icon" onClick={handleReset}>
+                <RotateCcw size={18} />
+              </Button>
+            </div>
+
+            {selectedNode && (
+              <div className="absolute top-4 right-4 w-64 bg-white/95 backdrop-blur-sm rounded-lg shadow-xl border border-gray-200 transition-all duration-300 ease-in-out">
+                <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50/50 rounded-t-lg">
+                  <h3 className="font-medium text-gray-800 flex items-center gap-2">
+                    {selectedNode.type === "folder" ? (
+                      <Folder size={16} className="text-blue-500" />
+                    ) : (
+                      <FileCode size={16} className="text-green-500" />
+                    )}
+                    {selectedNode.name}
+                  </h3>
+                  <button
+                    onClick={() => setSelectedNode(null)}
+                    className="text-gray-500 hover:text-gray-700 transition-colors"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <div className="p-4 max-h-[200px] overflow-auto">
+                  <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded">
+                    {selectedNode.content}
+                  </pre>
+                </div>
+              </div>
+            )}
+          </Card>
         </div>
-
-        {selectedNode && (
-          <div className="absolute top-4 right-4 w-96 bg-white/95 backdrop-blur-sm rounded-lg shadow-xl border border-gray-200 transition-all duration-300 ease-in-out">
-            <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50/50 rounded-t-lg">
-              <h3 className="font-medium text-gray-800 flex items-center gap-2">
-                {selectedNode.type === "folder" ? (
-                  <Folder size={16} className="text-blue-500" />
-                ) : (
-                  <FileCode size={16} className="text-green-500" />
-                )}
-                {selectedNode.name}
-              </h3>
-              <button
-                onClick={() => setSelectedNode(null)}
-                className="text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-            <div className="p-4 max-h-[400px] overflow-auto">
-              <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded">
-                {selectedNode.content}
-              </pre>
-            </div>
-          </div>
-        )}
-      </Card>
+        <div className="w-1/2 p-4">
+          <ChatInterface />
+        </div>
+      </div>
     </div>
+  </div>
   );
 };
 
