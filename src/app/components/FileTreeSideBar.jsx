@@ -1,76 +1,34 @@
-import { File, Folder, Tree } from "@/components/file-tree";
+import { File, Folder, Tree } from "@/components/file-tree"
 import { X } from "lucide-react"
 
 const ELEMENTS = [
-  {
-    id: "1",
-    isSelectable: true,
-    name: "src",
-    children: [
-      {
-        id: "2",
-        isSelectable: true,
-        name: "app",
-        children: [
-          {
-            id: "3",
-            isSelectable: true,
-            name: "layout.tsx",
-          },
-          {
-            id: "4",
-            isSelectable: true,
-            name: "page.tsx",
-          },
-        ],
-      },
-      {
-        id: "5",
-        isSelectable: true,
-        name: "components",
-        children: [
-          {
-            id: "6",
-            isSelectable: true,
-            name: "header.tsx",
-          },
-          {
-            id: "7",
-            isSelectable: true,
-            name: "footer.tsx",
-          },
-        ],
-      },
-      {
-        id: "8",
-        isSelectable: true,
-        name: "lib",
-        children: [
-          {
-            id: "9",
-            isSelectable: true,
-            name: "utils.ts",
-          },
-        ],
-      },
-    ],
-  },
+  { id: "1", type: "folder", name: "src" },
+  { id: "2", type: "folder", name: "app", parentId: "1" },
+  { id: "3", type: "file", name: "layout.tsx", parentId: "2" },
+  { id: "4", type: "file", name: "page.tsx", parentId: "2" },
+  { id: "5", type: "folder", name: "components", parentId: "1" },
+  { id: "6", type: "file", name: "header.tsx", parentId: "5" },
+  { id: "7", type: "file", name: "footer.tsx", parentId: "5" },
+  { id: "8", type: "folder", name: "lib", parentId: "1" },
+  { id: "9", type: "file", name: "utils.ts", parentId: "8" },
 ]
 
 const FileTreeSidebar = ({ isOpen, onClose }) => {
   return (
     <div
-      className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform ${isOpen ? "translate-x-0" : "-translate-x-full"} transition-transform duration-300 ease-in-out`}
+      className={`fixed inset-y-0 left-0 z-50 w-64 bg-gray-800 shadow-lg transform ${
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      } transition-transform duration-300 ease-in-out`}
     >
-      <div className="flex justify-between items-center p-4 border-b">
-        <h2 className="text-lg font-semibold">File Structure</h2>
-        <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+      <div className="flex justify-between items-center p-4 border-b border-gray-700">
+        <h2 className="text-lg font-semibold text-gray-100">File Structure</h2>
+        <button onClick={onClose} className="text-gray-400 hover:text-gray-100">
           <X size={24} />
         </button>
       </div>
       <div className="p-4">
         <Tree
-          className="overflow-hidden rounded-md bg-background"
+          className="overflow-hidden rounded-md bg-gray-900 text-gray-100"
           initialSelectedId="7"
           initialExpandedItems={["1", "2", "3", "4", "5", "6", "7", "8", "9"]}
           elements={ELEMENTS}

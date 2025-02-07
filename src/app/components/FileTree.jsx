@@ -2,18 +2,31 @@
 import { useRef, useCallback, useState, useMemo, useEffect } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 import { Card } from "@/components/ui/card";
-import { X, Folder, FileCode, ZoomIn, ZoomOut, RotateCcw, Menu } from "lucide-react"
-import * as THREE from "three";
+import { 
+  X, 
+  Folder, 
+  FileCode, 
+  ZoomIn, 
+  ZoomOut, 
+  RotateCcw, 
+  Menu,
+  Github,
+  Settings,
+  Bot,
+  Search
+} from "lucide-react";import * as THREE from "three";
 import SpriteText from "three-spritetext";
 import { Button } from "@/components/ui/button";
 import ChatInterface from "./ChatInterface";
 import FileTreeSidebar from "./FileTreeSideBar";
+import { Input } from "@/components/ui/input";
 
 const FileTree = () => {
   const fgRef = useRef();
   const [selectedNode, setSelectedNode] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("");
 
   const initialData = {
     nodes: [
@@ -220,18 +233,55 @@ const FileTree = () => {
   };
 
   return (
-    <div className="flex h-screen">
-    <FileTreeSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
-    <div className="flex flex-col flex-grow">
-      <div className="flex items-center justify-between p-4 bg-slate-800 text-white">
-        <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(!sidebarOpen)}>
-          <Menu size={24} />
-        </Button>
-        <h1 className="text-xl font-semibold">3D File Explorer</h1>
+    <div className="min-h-screen bg-[#0A0A0A]">
+    {/* Modern Navbar */}
+    <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0A0A0A]/90 backdrop-blur-lg border-b border-[#1F1F1F]">
+      <div className="px-4 h-16 flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="hover:bg-[#1F1F1F]"
+          >
+            <Menu size={20} className="text-gray-400" />
+          </Button>
+          <div className="flex items-center gap-2">
+            <Github className="h-6 w-6 text-white" />
+            <span className="text-lg font-semibold text-white">CodeVis</span>
+          </div>
+        </div>
+
+        <div className="flex-1 max-w-2xl mx-8">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input 
+              placeholder="Search repository..."
+              className="w-full bg-[#1F1F1F] border-0 pl-10 text-white placeholder:text-gray-500"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button variant="ghost" size="icon" className="hover:bg-[#1F1F1F]">
+            <Bot className="h-5 w-5 text-gray-400" />
+          </Button>
+          <Button variant="ghost" size="icon" className="hover:bg-[#1F1F1F]">
+            <Settings className="h-5 w-5 text-gray-400" />
+          </Button>
+        </div>
       </div>
-      <div className="flex flex-grow">
-        <div className="w-1/2 p-4">
-          <Card className="w-full h-full bg-gradient-to-br from-slate-900 to-slate-800 relative overflow-hidden">
+    </nav>
+   {/* Main Content */}
+   <div className="pt-16 flex h-[calc(100vh-4rem)]">
+        <FileTreeSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        
+        <div className="flex-1 flex">
+          {/* Graph Section */}
+          <div className="w-1/2 p-6">
+            <Card className="h-full bg-[#111111] border-[#1F1F1F] overflow-hidden relative">
             <ForceGraph3D
               ref={fgRef}
               graphData={graphData}
@@ -273,46 +323,50 @@ const FileTree = () => {
               height={dimensions.height - 100}
             />
 
-            <div className="absolute top-4 left-4 flex space-x-2">
-              <Button variant="secondary" size="icon" onClick={handleZoomIn}>
-                <ZoomIn size={18} />
-              </Button>
-              <Button variant="secondary" size="icon" onClick={handleZoomOut}>
-                <ZoomOut size={18} />
-              </Button>
-              <Button variant="secondary" size="icon" onClick={handleReset}>
-                <RotateCcw size={18} />
-              </Button>
-            </div>
-
-            {selectedNode && (
-              <div className="absolute top-4 right-4 w-64 bg-white/95 backdrop-blur-sm rounded-lg shadow-xl border border-gray-200 transition-all duration-300 ease-in-out">
-                <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-gray-50/50 rounded-t-lg">
-                  <h3 className="font-medium text-gray-800 flex items-center gap-2">
-                    {selectedNode.type === "folder" ? (
-                      <Folder size={16} className="text-blue-500" />
-                    ) : (
-                      <FileCode size={16} className="text-green-500" />
-                    )}
-                    {selectedNode.name}
-                  </h3>
-                  <button
-                    onClick={() => setSelectedNode(null)}
-                    className="text-gray-500 hover:text-gray-700 transition-colors"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-                <div className="p-4 max-h-[200px] overflow-auto">
-                  <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono bg-gray-50 p-4 rounded">
-                    {selectedNode.content}
-                  </pre>
-                </div>
+             {/* Controls */}
+             <div className="absolute top-4 left-4 flex gap-2 bg-[#1F1F1F]/90 backdrop-blur-sm p-2 rounded-lg">
+                <Button variant="ghost" size="icon" className="hover:bg-[#2D2D2D] text-gray-400">
+                  <ZoomIn size={18} />
+                </Button>
+                <Button variant="ghost" size="icon" className="hover:bg-[#2D2D2D] text-gray-400">
+                  <ZoomOut size={18} />
+                </Button>
+                <Button variant="ghost" size="icon" className="hover:bg-[#2D2D2D] text-gray-400">
+                  <RotateCcw size={18} />
+                </Button>
               </div>
-            )}
-          </Card>
-        </div>
-        <div className="w-1/2 p-4">
+
+           {/* Node Info Panel */}
+           {selectedNode && (
+                <div className="absolute top-4 right-4 w-72 bg-[#1F1F1F]/95 backdrop-blur-md rounded-xl border border-[#2D2D2D] shadow-2xl">
+                  <div className="flex items-center justify-between p-4 border-b border-[#2D2D2D]">
+                    <h3 className="font-medium text-gray-200 flex items-center gap-2">
+                      {selectedNode.type === "folder" ? (
+                        <Folder size={16} className="text-blue-400" />
+                      ) : (
+                        <FileCode size={16} className="text-green-400" />
+                      )}
+                      {selectedNode.name}
+                    </h3>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => setSelectedNode(null)}
+                      className="hover:bg-[#2D2D2D] text-gray-400"
+                    >
+                      <X size={18} />
+                    </Button>
+                  </div>
+                  <div className="p-4 max-h-[240px] overflow-auto custom-scrollbar">
+                    <pre className="text-sm text-gray-300 whitespace-pre-wrap font-mono bg-[#2D2D2D]/50 p-4 rounded-lg">
+                      {selectedNode.content}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </Card>
+          </div>
+        <div className="w-1/2 p-6">
           <ChatInterface />
         </div>
       </div>
