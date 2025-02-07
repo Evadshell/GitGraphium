@@ -7,8 +7,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState([
-    { 
-      role: "system", 
+    {
+      role: "system",
       content: "Welcome! I'm your AI assistant for exploring and understanding your codebase. How can I help you today?",
       timestamp: new Date().toISOString()
     },
@@ -35,16 +35,38 @@ const ChatInterface = () => {
       setInput("");
       setIsTyping(true);
 
-      // Simulate AI response
-      setTimeout(() => {
+      try {
+        const response = await fetch('http://localhost:8000/chat', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ query: input.trim() })
+        });
+
+        if (!response.ok) {
+          throw new Error('Network response was not ok');
+        }
+
+        const data = await response.json();
+        
         const aiMessage = {
           role: "system",
-          content: `I received your message: ${input.trim()}`,
+          content: data.response,
           timestamp: new Date().toISOString()
         };
+        
         setMessages(prev => [...prev, aiMessage]);
+      } catch (error) {
+        const errorMessage = {
+          role: "system",
+          content: "Sorry, I encountered an error while processing your request. Please try again.",
+          timestamp: new Date().toISOString()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
         setIsTyping(false);
-      }, 1000);
+      }
     }
   };
 
@@ -72,10 +94,10 @@ const ChatInterface = () => {
         </Button>
       </div>
       
-      <ScrollArea className="flex-grow p-6 space-y-6 custom-scrollbar">
+      <ScrollArea className="flex-grow p-6 space-y-6 custom-scrollbar" ref={scrollAreaRef}>
         {messages.map((message, index) => (
-          <div 
-            key={index} 
+          <div
+            key={index}
             className={`flex items-start gap-3 message-in ${
               message.role === "user" ? "justify-end" : "justify-start"
             }`}
@@ -89,12 +111,12 @@ const ChatInterface = () => {
             <div className={`max-w-[80%] space-y-1 ${message.role === "user" ? "items-end" : "items-start"}`}>
               <div
                 className={`rounded-2xl px-4 py-3 ${
-                  message.role === "user" 
-                    ? "bg-primary text-primary-foreground ml-auto" 
+                  message.role === "user"
+                    ? "bg-primary text-primary-foreground ml-auto"
                     : "bg-secondary text-secondary-foreground"
                 }`}
               >
-                <p className="text-[15px] leading-relaxed">{message.content}</p>
+                <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
               </div>
               <span className="text-xs text-muted-foreground px-2">
                 {formatTime(message.timestamp)}
@@ -123,8 +145,8 @@ const ChatInterface = () => {
 
       <div className="p-4 border-t border-border">
         <div className="flex gap-2">
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             size="icon"
             className="text-muted-foreground hover:text-foreground hover:bg-secondary"
           >
@@ -137,7 +159,7 @@ const ChatInterface = () => {
             onKeyPress={(e) => e.key === "Enter" && handleSend()}
             className="flex-grow bg-secondary border-transparent text-foreground placeholder:text-muted-foreground focus:border-primary"
           />
-          <Button 
+          <Button
             onClick={handleSend}
             className="bg-primary hover:bg-primary/90 text-primary-foreground"
             size="icon"
