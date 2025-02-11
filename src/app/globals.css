@@ -99,3 +99,23 @@ code, pre {
     transform: translateY(0);
   }
 }
+@layer utilities {
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #2D2D2D #1F1F1F;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: #1F1F1F;
+    border-radius: 3px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: #2D2D2D;
+    border-radius: 3px;
+  }
+}
