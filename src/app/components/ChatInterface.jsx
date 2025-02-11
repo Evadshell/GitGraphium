@@ -2,71 +2,87 @@ import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Send, Paperclip, Bot, User, Sparkles } from "lucide-react";
+import { Send, Bot, User } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 
 const ChatInterface = () => {
   const [messages, setMessages] = useState([
     {
       role: "system",
-      content: "Welcome! I'm your AI assistant for exploring and understanding your codebase. How can I help you today?",
+      content: "How can I help you explore and understand your codebase today?",
       timestamp: new Date().toISOString()
     },
   ]);
   const [input, setInput] = useState("");
   const [isTyping, setIsTyping] = useState(false);
+  const [error, setError] = useState(null);
   const scrollAreaRef = useRef(null);
 
   useEffect(() => {
     if (scrollAreaRef.current) {
-      scrollAreaRef.current.scrollTop = scrollAreaRef.current.scrollHeight;
+      const scrollArea = scrollAreaRef.current;
+      scrollArea.scrollTop = scrollArea.scrollHeight;
     }
   }, [messages]);
 
   const handleSend = async () => {
-    if (input.trim()) {
-      const userMessage = {
-        role: "user",
-        content: input.trim(),
+    if (!input.trim()) return;
+
+    const userMessage = {
+      role: "user",
+      content: input.trim(),
+      timestamp: new Date().toISOString()
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    setInput("");
+    setIsTyping(true);
+    setError(null);
+
+    try {
+      const response = await fetch('http://localhost:8000/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          query: input.trim() 
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.detail || 'Failed to get response');
+      }
+
+      const aiMessage = {
+        role: "system",
+        content: data.response || "I couldn't process that request. Please try again.",
+        context: data.context,
         timestamp: new Date().toISOString()
       };
       
-      setMessages(prev => [...prev, userMessage]);
-      setInput("");
-      setIsTyping(true);
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Chat error:', error);
+      setError(error.message);
+      
+      const errorMessage = {
+        role: "system",
+        content: `Error: ${error.message}. Please try again or check if the server is running.`,
+        timestamp: new Date().toISOString()
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsTyping(false);
+    }
+  };
 
-      try {
-        const response = await fetch('http://localhost:8000/chat', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ query: input.trim() })
-        });
-
-        if (!response.ok) {
-          throw new Error('Network response was not ok');
-        }
-
-        const data = await response.json();
-        
-        const aiMessage = {
-          role: "system",
-          content: data.response,
-          timestamp: new Date().toISOString()
-        };
-        
-        setMessages(prev => [...prev, aiMessage]);
-      } catch (error) {
-        const errorMessage = {
-          role: "system",
-          content: "Sorry, I encountered an error while processing your request. Please try again.",
-          timestamp: new Date().toISOString()
-        };
-        setMessages(prev => [...prev, errorMessage]);
-      } finally {
-        setIsTyping(false);
-      }
+  const handleKeyPress = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
   };
 
@@ -78,62 +94,66 @@ const ChatInterface = () => {
   };
 
   return (
-    <Card className="flex flex-col h-full bg-background border-border rounded-xl overflow-hidden">
-      <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+    <Card className="flex flex-col h-full bg-slate-950 border-slate-800 rounded-xl overflow-hidden">
+      <div className="px-6 py-3 border-b border-slate-800 bg-slate-900">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-            <Bot size={20} className="text-primary" />
+          <div className="w-8 h-8 rounded-lg bg-indigo-500/10 flex items-center justify-center">
+            <Bot size={18} className="text-indigo-400" />
           </div>
           <div>
-            <h2 className="text-lg font-semibold text-foreground">AI Assistant</h2>
-            <p className="text-sm text-muted-foreground">Exploring your codebase</p>
+            <h2 className="text-sm font-medium text-slate-200">AI Assistant</h2>
+            <p className="text-xs text-slate-400">Code Explorer</p>
           </div>
         </div>
-        <Button variant="ghost" size="icon" className="hover:bg-secondary">
-          <Sparkles size={20} className="text-primary" />
-        </Button>
       </div>
-      
-      <ScrollArea className="flex-grow p-6 space-y-6 custom-scrollbar" ref={scrollAreaRef}>
+
+      <ScrollArea className="flex-grow px-4 py-6 space-y-6 bg-gradient-to-b from-slate-950 to-slate-900" ref={scrollAreaRef}>
         {messages.map((message, index) => (
           <div
-            key={index}
-            className={`flex items-start gap-3 message-in ${
+            key={`${message.timestamp}-${index}`}
+            className={`flex items-start gap-3 ${
               message.role === "user" ? "justify-end" : "justify-start"
-            }`}
+            } mb-6`}
           >
             {message.role === "system" && (
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <Bot size={20} className="text-primary" />
+              <div className="w-8 h-8 rounded-lg bg-slate-800/50 flex items-center justify-center flex-shrink-0">
+                <Bot size={16} className="text-indigo-400" />
               </div>
             )}
             
-            <div className={`max-w-[80%] space-y-1 ${message.role === "user" ? "items-end" : "items-start"}`}>
+            <div className={`max-w-[70%] space-y-1 ${message.role === "user" ? "items-end" : "items-start"}`}>
               <div
-                className={`rounded-2xl px-4 py-3 ${
+                className={`rounded-2xl px-4 py-2.5 ${
                   message.role === "user"
-                    ? "bg-primary text-primary-foreground ml-auto"
-                    : "bg-secondary text-secondary-foreground"
+                    ? "bg-indigo-500 text-white"
+                    : "bg-slate-800 text-slate-200 border border-slate-700"
                 }`}
               >
-                <p className="text-[15px] leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</p>
+                {message.context && message.context.relevant_function && (
+                  <div className="mt-2 pt-2 border-t border-slate-700/50 text-xs">
+                    <p className="font-medium text-slate-300">Related Function: 
+                      <span className="text-indigo-300 ml-1">{message.context.relevant_function.name}</span>
+                    </p>
+                  </div>
+                )}
               </div>
-              <span className="text-xs text-muted-foreground px-2">
+              <span className="text-[10px] text-slate-500 px-1">
                 {formatTime(message.timestamp)}
               </span>
             </div>
 
             {message.role === "user" && (
-              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                <User size={20} className="text-primary" />
+              <div className="w-8 h-8 rounded-lg bg-slate-800/50 flex items-center justify-center flex-shrink-0">
+                <User size={16} className="text-indigo-400" />
               </div>
             )}
           </div>
         ))}
         
         {isTyping && (
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Bot size={20} />
+          <div className="flex items-center gap-2 text-slate-400">
+            <Bot size={16} />
             <div className="flex gap-1">
               <span className="animate-bounce">●</span>
               <span className="animate-bounce" style={{ animationDelay: "0.2s" }}>●</span>
@@ -143,28 +163,27 @@ const ChatInterface = () => {
         )}
       </ScrollArea>
 
-      <div className="p-4 border-t border-border">
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="text-muted-foreground hover:text-foreground hover:bg-secondary"
-          >
-            <Paperclip size={20} />
-          </Button>
+      <div className="p-4 border-t border-slate-800 bg-slate-900/50 backdrop-blur">
+        {error && (
+          <div className="mb-2 text-xs text-red-400">
+            {error}
+          </div>
+        )}
+        <div className="flex gap-2 items-center">
           <Input
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask me anything about your code..."
-            onKeyPress={(e) => e.key === "Enter" && handleSend()}
-            className="flex-grow bg-secondary border-transparent text-foreground placeholder:text-muted-foreground focus:border-primary"
+            onKeyDown={handleKeyPress}
+            placeholder="Message..."
+            className="flex-grow bg-slate-800 border-slate-700 text-slate-200 placeholder:text-slate-500 text-sm rounded-xl focus-visible:ring-indigo-500 focus-visible:ring-1"
           />
           <Button
             onClick={handleSend}
-            className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            className="bg-indigo-500 hover:bg-indigo-600 text-white rounded-xl shadow-lg shadow-indigo-500/20"
             size="icon"
+            disabled={isTyping || !input.trim()}
           >
-            <Send size={20} />
+            <Send size={16} />
           </Button>
         </div>
       </div>

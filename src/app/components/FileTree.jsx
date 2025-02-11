@@ -318,7 +318,7 @@ const FileTree = () => {
 
                 return group
               }}
-              backgroundColor="#0F172A"
+              backgroundColor="#080808FF"
               width={dimensions.width / 2 - 32}
               height={dimensions.height - 100}
             />
