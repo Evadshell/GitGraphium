@@ -1,70 +1,89 @@
-"use client"
+"use client";
 
-import { useRef, useCallback, useState, useEffect } from "react"
-import ForceGraph3D from "react-force-graph-3d"
-import { Card } from "@/components/ui/card"
-import Particles from "react-tsparticles"
-import { X, RotateCcw, Menu, Github, Settings, Bot, Search, Maximize2, MinusCircle, PlusCircle } from "lucide-react"
-import * as THREE from "three"
-import SpriteText from "three-spritetext"
-import { Button } from "@/components/ui/button"
-import ChatInterface from "./ChatInterface"
-import FileTreeSidebar from "./FileTreeSideBar"
-import { Input } from "@/components/ui/input"
+import { useRef, useCallback, useState, useEffect } from "react";
+import ForceGraph3D from "react-force-graph-3d";
+import { Card } from "@/components/ui/card";
+import Particles from "react-tsparticles";
+import {
+  X,
+  RotateCcw,
+  Menu,
+  Github,
+  Settings,
+  Bot,
+  Search,
+  Maximize2,
+  MinusCircle,
+  PlusCircle,
+} from "lucide-react";
+import * as THREE from "three";
+import SpriteText from "three-spritetext";
+import { Button } from "@/components/ui/button";
+import ChatInterface from "./ChatInterface";
+import FileTreeSidebar from "./FileTreeSideBar";
+import { Input } from "@/components/ui/input";
 
 const FileTree = () => {
-  const fgRef = useRef()
-  const [selectedNode, setSelectedNode] = useState(null)
-  const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
-  const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isFullScreen, setIsFullScreen] = useState(false)
-  const [repoUrl, setRepoUrl] = useState("")
-  const [graphData, setGraphData] = useState({ nodes: [], links: [] })
-  const [loading, setLoading] = useState(false)
+  const fgRef = useRef();
+  const [selectedNode, setSelectedNode] = useState(null);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const [repoUrl, setRepoUrl] = useState("");
+  const [graphData, setGraphData] = useState({ nodes: [], links: [] });
+  const [loading, setLoading] = useState(false);
 
   const fetchRepoTree = async () => {
     try {
-      setLoading(true)
-      const match = repoUrl.match(/github\.com\/(.*)\/(.*)/)
+      setLoading(true);
+      const match = repoUrl.match(/github\.com\/(.*)\/(.*)/);
       if (!match) {
-        alert("Invalid GitHub repository URL")
-        return
+        alert("Invalid GitHub repository URL");
+        return;
       }
 
-      const [_, owner, repo] = match
-      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/git/trees/main?recursive=1`)
-      const data = await res.json()
+      const [_, owner, repo] = match;
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/git/trees/main?recursive=1`
+      );
+      const data = await res.json();
 
-      if (!data.tree) throw new Error("Invalid repository structure")
+      if (!data.tree) throw new Error("Invalid repository structure");
 
-      const { nodes, links } = processGitHubTree(data.tree)
-      setGraphData({ nodes, links })
+      const { nodes, links } = processGitHubTree(data.tree);
+      setGraphData({ nodes, links });
     } catch (error) {
-      console.error("Error fetching repository:", error)
-      alert("Failed to fetch repository")
+      console.error("Error fetching repository:", error);
+      alert("Failed to fetch repository");
     } finally {
-      setLoading(false)
+      setLoading(false);
     }
-  }
+  };
 
   const processGitHubTree = (tree) => {
-    const nodes = []
-    const links = []
-    const nodeMap = {}
+    const nodes = [];
+    const links = [];
+    const nodeMap = {};
 
     // Create root node
-    const rootNode = { id: "root", name: "root", children: [], type: "folder", size: 2 }
-    nodeMap["root"] = rootNode
-    nodes.push(rootNode)
+    const rootNode = {
+      id: "root",
+      name: "root",
+      children: [],
+      type: "folder",
+      size: 2,
+    };
+    nodeMap["root"] = rootNode;
+    nodes.push(rootNode);
 
     tree.forEach((item) => {
-      const pathParts = item.path.split("/")
-      let parentNode = rootNode
+      const pathParts = item.path.split("/");
+      let parentNode = rootNode;
 
       pathParts.forEach((part, index) => {
-        const isLastPart = index === pathParts.length - 1
-        const currentPath = pathParts.slice(0, index + 1).join("/")
-        const nodeId = currentPath
+        const isLastPart = index === pathParts.length - 1;
+        const currentPath = pathParts.slice(0, index + 1).join("/");
+        const nodeId = currentPath;
 
         if (!nodeMap[nodeId]) {
           const newNode = {
@@ -74,108 +93,123 @@ const FileTree = () => {
             type: isLastPart && item.type === "blob" ? "file" : "folder",
             size: isLastPart && item.type === "blob" ? 1 : 1.5,
             collapsed: true,
-          }
-          nodeMap[nodeId] = newNode
-          nodes.push(newNode)
-          parentNode.children.push(newNode)
-          links.push({ source: parentNode.id, target: nodeId })
+          };
+          nodeMap[nodeId] = newNode;
+          nodes.push(newNode);
+          parentNode.children.push(newNode);
+          links.push({ source: parentNode.id, target: nodeId });
         }
 
-        parentNode = nodeMap[nodeId]
-      })
-    })
+        parentNode = nodeMap[nodeId];
+      });
+    });
 
-    return { nodes, links }
-  }
- const getPrunedTree = useCallback(() => {
-    const visibleNodes = []
-    const visibleLinks = []
+    return { nodes, links };
+  };
+  const getPrunedTree = useCallback(() => {
+    const visibleNodes = [];
+    const visibleLinks = [];
 
     const traverseTree = (node) => {
-      if (!node) return
+      if (!node) return;
 
-      visibleNodes.push(node)
-      if (node.collapsed) return
+      visibleNodes.push(node);
+      if (node.collapsed) return;
 
       node.children.forEach((childNode) => {
-        visibleLinks.push({ source: node.id, target: childNode.id })
-        traverseTree(childNode)
-      })
-    }
-
-    traverseTree(graphData.nodes.find((n) => n.id === "root"))
-    return { nodes: visibleNodes, links: visibleLinks }
-  }, [graphData])
+        visibleLinks.push({ source: node.id, target: childNode.id });
+        traverseTree(childNode);
+      });
+    };
+    console.log(graphData);
+    traverseTree(graphData.nodes.find((n) => n.id === "root"));
+    // console.log(nodema)
+    return { nodes: visibleNodes, links: visibleLinks };
+  }, [graphData]);
   const handleNodeClick = useCallback(
     (node) => {
-      if (!node) return
+      if (!node) return;
 
       // Toggle node expansion
-      node.collapsed = !node.collapsed
+      node.collapsed = !node.collapsed;
 
       // Update visible nodes and links
-      setGraphData(getPrunedTree())
+      setGraphData(getPrunedTree());
 
       // Update selected node
-      setSelectedNode(node)
-
+      setSelectedNode(node);
+console.log(graphData)
       // Focus camera on clicked node
-      const distance = 40
-      const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z)
-      fgRef.current.cameraPosition({ x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio }, node, 1000)
+      const distance = 40;
+      const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z);
+      fgRef.current.cameraPosition(
+        { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
+        node,
+        1000
+      );
     },
-    [getPrunedTree],
-  )
-
- 
+    [getPrunedTree]
+  );
 
   const handleFullScreen = () => {
-    setIsFullScreen(!isFullScreen)
-  }
+    setIsFullScreen(!isFullScreen);
+  };
 
   const getNodeColor = useCallback((node) => {
     switch (node.type) {
       case "folder":
-        return "#60A5FA"
+        return "#60A5FA";
       case "file":
         if (node.name.endsWith(".tsx") || node.name.endsWith(".ts")) {
-          return "#34D399"
+          return "#34D399";
         }
-        return "#F87171"
+        return "#F87171";
     }
-  }, [])
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
       setDimensions({
         width: window.innerWidth,
         height: window.innerHeight,
-      })
-    }
+      });
+    };
 
-    window.addEventListener("resize", handleResize)
-    handleResize()
+    window.addEventListener("resize", handleResize);
+    handleResize();
 
-    return () => window.removeEventListener("resize", handleResize)
-  }, [])
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   useEffect(() => {
-    setGraphData(getPrunedTree())
-  }, [])
+    setGraphData(getPrunedTree());
+  }, []);
 
   const handleZoomIn = () => {
-    const { x, y, z } = fgRef.current.cameraPosition()
-    fgRef.current.cameraPosition({ x: x * 0.8, y: y * 0.8, z: z * 0.8 }, null, 500)
-  }
+    const { x, y, z } = fgRef.current.cameraPosition();
+    fgRef.current.cameraPosition(
+      { x: x * 0.8, y: y * 0.8, z: z * 0.8 },
+      null,
+      500
+    );
+  };
 
   const handleZoomOut = () => {
-    const { x, y, z } = fgRef.current.cameraPosition()
-    fgRef.current.cameraPosition({ x: x * 1.2, y: y * 1.2, z: z * 1.2 }, null, 500)
-  }
+    const { x, y, z } = fgRef.current.cameraPosition();
+    fgRef.current.cameraPosition(
+      { x: x * 1.2, y: y * 1.2, z: z * 1.2 },
+      null,
+      500
+    );
+  };
 
   const handleReset = () => {
-    fgRef.current.cameraPosition({ x: 0, y: 0, z: 200 }, { x: 0, y: 0, z: 0 }, 500)
-  }
+    fgRef.current.cameraPosition(
+      { x: 0, y: 0, z: 200 },
+      { x: 0, y: 0, z: 0 },
+      500
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#0A0A0A] relative overflow-hidden">
@@ -233,7 +267,9 @@ const FileTree = () => {
             </Button>
             <div className="flex items-center gap-3">
               <Github className="h-6 w-6 text-blue-400" />
-              <span className="text-xl font-semibold text-white tracking-tight">CodeVis</span>
+              <span className="text-xl font-semibold text-white tracking-tight">
+                CodeVis
+              </span>
             </div>
           </div>
 
@@ -257,10 +293,18 @@ const FileTree = () => {
           </div>
 
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" className="hover:bg-[#1F1F1F] transition-colors">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:bg-[#1F1F1F] transition-colors"
+            >
               <Bot className="h-5 w-5 text-gray-400 hover:text-blue-400 transition-colors" />
             </Button>
-            <Button variant="ghost" size="icon" className="hover:bg-[#1F1F1F] transition-colors">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="hover:bg-[#1F1F1F] transition-colors"
+            >
               <Settings className="h-5 w-5 text-gray-400 hover:text-blue-400 transition-colors" />
             </Button>
           </div>
@@ -269,11 +313,18 @@ const FileTree = () => {
 
       {/* Main Content */}
       <div className="pt-16 flex h-[calc(100vh-4rem)]">
-        <FileTreeSidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <FileTreeSidebar
+          isOpen={sidebarOpen}
+          onClose={() => setSidebarOpen(false)}
+        />
 
         <div className="flex-1 flex flex-col lg:flex-row p-6 gap-6">
           {/* Graph Section */}
-          <div className={`${isFullScreen ? "w-full" : "lg:w-1/2"} transition-all duration-300 ease-out`}>
+          <div
+            className={`${
+              isFullScreen ? "w-full" : "lg:w-1/2"
+            } transition-all duration-300 ease-out`}
+          >
             <Card className="h-full bg-[#111111]/80 backdrop-blur-md border-[#1F1F1F] overflow-hidden relative">
               <div className="absolute top-4 left-4 flex gap-2 bg-[#1F1F1F]/90 backdrop-blur-xl p-2 rounded-lg border border-[#2D2D2D] shadow-xl z-10">
                 <Button
@@ -319,20 +370,22 @@ const FileTree = () => {
                 linkDirectionalParticles={2}
                 onNodeClick={handleNodeClick}
                 nodeThreeObject={(node) => {
-                  const group = new THREE.Group()
+                  const group = new THREE.Group();
                   const sphere = new THREE.Mesh(
                     new THREE.SphereGeometry(node.size),
-                    new THREE.MeshStandardMaterial({ color: getNodeColor(node) }),
-                  )
-                  group.add(sphere)
+                    new THREE.MeshStandardMaterial({
+                      color: getNodeColor(node),
+                    })
+                  );
+                  group.add(sphere);
 
-                  const sprite = new SpriteText(node.name)
-                  sprite.color = "white"
-                  sprite.textHeight = 4
-                  sprite.position.y = node.size + 2
-                  group.add(sprite)
+                  const sprite = new SpriteText(node.name);
+                  sprite.color = "white";
+                  sprite.textHeight = 4;
+                  sprite.position.y = node.size + 2;
+                  group.add(sprite);
 
-                  return group
+                  return group;
                 }}
                 width={dimensions.width}
                 height={dimensions.height}
@@ -342,7 +395,9 @@ const FileTree = () => {
               {selectedNode && (
                 <div className="absolute top-4 right-4 bg-[#1F1F1F]/90 backdrop-blur-xl p-4 rounded-lg shadow-lg border border-[#2D2D2D]">
                   <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-lg font-bold text-white">{selectedNode.name}</h3>
+                    <h3 className="text-lg font-bold text-white">
+                      {selectedNode.name}
+                    </h3>
                     <Button
                       onClick={() => setSelectedNode(null)}
                       variant="ghost"
@@ -365,8 +420,7 @@ const FileTree = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default FileTree
-
+export default FileTree;
