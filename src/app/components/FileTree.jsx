@@ -2,8 +2,12 @@
 
 import { useRef, useCallback, useState, useEffect } from "react";
 import ForceGraph3D from "react-force-graph-3d";
-import { Card } from "@/components/ui/card";
-import Particles from "react-tsparticles";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "../../components/ui/card";
 import {
   X,
   RotateCcw,
@@ -15,15 +19,26 @@ import {
   Maximize2,
   MinusCircle,
   PlusCircle,
+  ZoomIn,
+  ZoomOut,
+  RefreshCw,
 } from "lucide-react";
 import * as THREE from "three";
 import SpriteText from "three-spritetext";
-import { Button } from "@/components/ui/button";
+import { Button } from "../../components/ui/button";
 import ChatInterface from "./ChatInterface";
 import FileTreeSidebar from "./FileTreeSideBar";
-import { Input } from "@/components/ui/input";
+import { Input } from "../../components/ui/input";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../../components/ui/tooltip";
 
 const FileTree = () => {
+  const [success, setSuccess] = useState(null);
+
   const fgRef = useRef();
   const [selectedNode, setSelectedNode] = useState(null);
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
@@ -32,29 +47,77 @@ const FileTree = () => {
   const [repoUrl, setRepoUrl] = useState("");
   const [graphData, setGraphData] = useState({ nodes: [], links: [] });
   const [loading, setLoading] = useState(false);
-
+  const [error, setError] = useState(null);
+  const [theme, setTheme] = useState("dark"); // Added theme state
   const fetchRepoTree = async () => {
+    if (!repoUrl.trim()) {
+      setError("Please enter a valid GitHub repository URL");
+      return;
+    }
+
     try {
       setLoading(true);
-      const match = repoUrl.match(/github\.com\/(.*)\/(.*)/);
+      setError(null);
+
+      // Parse GitHub URL
+      const match = repoUrl.match(/github\.com\/([^\/]+)\/([^\/\s]+)(\.git)?/);
       if (!match) {
-        alert("Invalid GitHub repository URL");
+        setError(
+          "Invalid GitHub repository URL. Please use a valid GitHub repository URL."
+        );
         return;
       }
 
       const [_, owner, repo] = match;
-      const res = await fetch(
+      const branches = ["main", "master"];
+
+      // Fetch from GitHub API for visualization
+      const githubResponse = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/git/trees/main?recursive=1`
       );
-      const data = await res.json();
 
-      if (!data.tree) throw new Error("Invalid repository structure");
+      if (!githubResponse.ok) {
+        throw new Error(`GitHub API error: ${githubResponse.statusText}`);
+      }
 
-      const { nodes, links } = processGitHubTree(data.tree);
+      const githubData = await githubResponse.json();
+
+      if (!githubData.tree) {
+        throw new Error("Invalid repository structure from GitHub");
+      }
+
+      // Process GitHub data for visualization
+      const { nodes, links } = processGitHubTree(githubData.tree);
       setGraphData({ nodes, links });
+
+      // Send to backend for processing
+      const backendResponse = await fetch("http://localhost:8000/clone_repo", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ repo_url: repoUrl }),
+      });
+
+      if (!backendResponse.ok) {
+        throw new Error(
+          `Backend processing error: ${backendResponse.statusText}`
+        );
+      }
+
+      const backendData = await backendResponse.json();
+
+      // You might want to store the backend response data in state if needed
+      // setBackendData(backendData);
+
+      // Optional: Show success message
+      setSuccess("Repository processed successfully!");
     } catch (error) {
-      console.error("Error fetching repository:", error);
-      alert("Failed to fetch repository");
+      console.error("Error processing repository:", error);
+      setError(error.message || "Failed to process repository");
+
+      // Clear graph data if there's an error
+      setGraphData({ nodes: [], links: [] });
     } finally {
       setLoading(false);
     }
@@ -106,6 +169,7 @@ const FileTree = () => {
 
     return { nodes, links };
   };
+
   const getPrunedTree = useCallback(() => {
     const visibleNodes = [];
     const visibleLinks = [];
@@ -121,25 +185,18 @@ const FileTree = () => {
         traverseTree(childNode);
       });
     };
-    console.log(graphData);
     traverseTree(graphData.nodes.find((n) => n.id === "root"));
-    // console.log(nodema)
     return { nodes: visibleNodes, links: visibleLinks };
   }, [graphData]);
+
   const handleNodeClick = useCallback(
     (node) => {
       if (!node) return;
 
-      // Toggle node expansion
       node.collapsed = !node.collapsed;
-
-      // Update visible nodes and links
       setGraphData(getPrunedTree());
-
-      // Update selected node
       setSelectedNode(node);
-console.log(graphData)
-      // Focus camera on clicked node
+
       const distance = 40;
       const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z);
       fgRef.current.cameraPosition(
@@ -148,24 +205,42 @@ console.log(graphData)
         1000
       );
     },
-    [getPrunedTree]
+    [getPrunedTree, graphData]
   );
 
   const handleFullScreen = () => {
     setIsFullScreen(!isFullScreen);
   };
 
-  const getNodeColor = useCallback((node) => {
-    switch (node.type) {
-      case "folder":
-        return "#60A5FA";
-      case "file":
-        if (node.name.endsWith(".tsx") || node.name.endsWith(".ts")) {
-          return "#34D399";
-        }
-        return "#F87171";
-    }
-  }, []);
+  const getNodeColor = useCallback(
+    (node) => {
+      const colors = {
+        dark: {
+          folder: "#60A5FA",
+          typescript: "#34D399",
+          default: "#F87171",
+        },
+        light: {
+          folder: "#3B82F6",
+          typescript: "#10B981",
+          default: "#EF4444",
+        },
+      };
+
+      const colorSet = colors[theme];
+
+      switch (node.type) {
+        case "folder":
+          return colorSet.folder;
+        case "file":
+          if (node.name.endsWith(".tsx") || node.name.endsWith(".ts")) {
+            return colorSet.typescript;
+          }
+          return colorSet.default;
+      }
+    },
+    [theme]
+  );
 
   useEffect(() => {
     const handleResize = () => {
@@ -211,176 +286,173 @@ console.log(graphData)
     );
   };
 
-  return (
-    <div className="min-h-screen bg-[#0A0A0A] relative overflow-hidden">
-      {/* Particle Background */}
-      <div className="absolute inset-0 pointer-events-none">
-        <Particles
-          options={{
-            background: {
-              color: {
-                value: "transparent",
-              },
-            },
-            particles: {
-              number: {
-                value: 30,
-                density: {
-                  enable: true,
-                  value_area: 1000,
-                },
-              },
-              color: {
-                value: "#1F1F1F",
-              },
-              line_linked: {
-                enable: true,
-                color: "#2D3748",
-                opacity: 0.2,
-              },
-              move: {
-                enable: true,
-                speed: 0.5,
-              },
-              size: {
-                value: 2,
-              },
-              opacity: {
-                value: 0.3,
-              },
-            },
-          }}
-        />
-      </div>
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
 
-      {/* Modern Navbar with Glassmorphism */}
-      <nav className="fixed top-0 left-0 right-0 z-50 bg-[#0A0A0A]/80 backdrop-blur-xl border-b border-[#1F1F1F] shadow-lg">
-        <div className="px-6 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-6">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="hover:bg-[#1F1F1F] transition-colors duration-200"
-            >
-              <Menu size={20} className="text-gray-400" />
-            </Button>
+  const bgColor = theme === "dark" ? "bg-zinc-950" : "bg-slate-50";
+  const textColor = theme === "dark" ? "text-white" : "text-zinc-800";
+  const borderColor = theme === "dark" ? "border-zinc-800" : "border-zinc-200";
+  const buttonHoverBg =
+    theme === "dark" ? "hover:bg-zinc-800" : "hover:bg-zinc-100";
+  const inputBg = theme === "dark" ? "bg-zinc-900" : "bg-white";
+  const panelBg = theme === "dark" ? "bg-zinc-900/90" : "bg-white/90";
+
+  return (
+    <TooltipProvider>
+      <div className={`h-screen w-screen ${bgColor} flex flex-col overflow-hidden`}>
+        {/* Elegant Navbar */}
+        <nav
+          className={`h-16 border-b ${borderColor} ${bgColor} flex items-center px-6 shrink-0`}
+        >
+          <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
-              <Github className="h-6 w-6 text-blue-400" />
-              <span className="text-xl font-semibold text-white tracking-tight">
+              <Github className="h-6 w-6 text-blue-500" />
+              <span className={`text-xl font-semibold ${textColor}`}>
                 CodeVis
               </span>
             </div>
           </div>
-
-          <div className="flex-1 max-w-3xl mx-12">
-            <div className="relative group flex items-center">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 transition-colors group-hover:text-blue-400" />
+          <div className="flex-1 max-w-2xl mx-auto">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-3 flex items-center">
+                <Search
+                  className={`h-4 w-4 ${
+                    theme === "dark" ? "text-zinc-400" : "text-zinc-600"
+                  }`}
+                />
+              </div>
               <Input
-                placeholder="Enter GitHub repo URL"
-                className="pl-10 pr-24 py-2 w-full bg-[#1F1F1F] text-white border-[#2D2D2D] focus:border-blue-400 focus:ring-blue-400"
+                placeholder="Enter GitHub repository URL"
+                className={`w-full h-10 pl-10 ${inputBg} ${textColor} border-${borderColor} focus:border-blue-500 focus:ring-blue-500 rounded-lg`}
                 value={repoUrl}
                 onChange={(e) => setRepoUrl(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && fetchRepoTree()}
               />
-              <Button
-                onClick={fetchRepoTree}
-                className="absolute right-0 bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-r"
-                disabled={loading}
-              >
-                {loading ? "Fetching..." : "Fetch"}
-              </Button>
             </div>
           </div>
-
           <div className="flex items-center gap-3">
             <Button
+              onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               variant="ghost"
               size="icon"
-              className="hover:bg-[#1F1F1F] transition-colors"
+              className={buttonHoverBg}
             >
-              <Bot className="h-5 w-5 text-gray-400 hover:text-blue-400 transition-colors" />
+              {theme === "dark" ? "☀️" : "🌙"}
             </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="hover:bg-[#1F1F1F] transition-colors"
-            >
-              <Settings className="h-5 w-5 text-gray-400 hover:text-blue-400 transition-colors" />
+            <Button variant="ghost" size="icon" className={buttonHoverBg}>
+              <Bot className="h-5 w-5 text-zinc-400" />
+            </Button>
+            <Button variant="ghost" size="icon" className={buttonHoverBg}>
+              <Settings className="h-5 w-5 text-zinc-400" />
             </Button>
           </div>
-        </div>
-      </nav>
+        </nav>
 
-      {/* Main Content */}
-      <div className="pt-16 flex h-[calc(100vh-4rem)]">
-        <FileTreeSidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-        />
+        {/* Main Content */}
+        <div className="flex-1 flex min-h-0">
+          <FileTreeSidebar
+            isOpen={sidebarOpen}
+            onClose={() => setSidebarOpen(false)}
+            theme={theme}
+          />
 
-        <div className="flex-1 flex flex-col lg:flex-row p-6 gap-6">
-          {/* Graph Section */}
-          <div
-            className={`${
-              isFullScreen ? "w-full" : "lg:w-1/2"
-            } transition-all duration-300 ease-out`}
-          >
-            <Card className="h-full bg-[#111111]/80 backdrop-blur-md border-[#1F1F1F] overflow-hidden relative">
-              <div className="absolute top-4 left-4 flex gap-2 bg-[#1F1F1F]/90 backdrop-blur-xl p-2 rounded-lg border border-[#2D2D2D] shadow-xl z-10">
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleZoomIn}
-                  className="hover:bg-[#2D2D2D] text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  <PlusCircle size={18} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleZoomOut}
-                  className="hover:bg-[#2D2D2D] text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  <MinusCircle size={18} />
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleReset}
-                  className="hover:bg-[#2D2D2D] text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  <RotateCcw size={18} />
-                </Button>
-                <div className="w-px h-4 bg-[#2D2D2D] my-auto" />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={handleFullScreen}
-                  className="hover:bg-[#2D2D2D] text-gray-400 hover:text-blue-400 transition-colors"
-                >
-                  <Maximize2 size={18} />
-                </Button>
+          <div className="flex-1 flex min-h-0">
+            {/* Graph View */}
+            <div
+              className={`${
+                isFullScreen ? "w-full" : "w-7/12"
+              } relative transition-all duration-300`}
+            >
+              {/* Graph Controls */}
+              <div
+                className={`absolute top-4 left-4 z-10 flex gap-1 ${panelBg} backdrop-blur-xl p-2 rounded-lg border ${borderColor}`}
+              >
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleZoomIn}
+                      className={`h-8 w-8 ${buttonHoverBg}`}
+                    >
+                      <PlusCircle size={16} className={textColor} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Zoom In</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleZoomOut}
+                      className={`h-8 w-8 ${buttonHoverBg}`}
+                    >
+                      <MinusCircle size={16} className={textColor} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Zoom Out</TooltipContent>
+                </Tooltip>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleReset}
+                      className={`h-8 w-8 ${buttonHoverBg}`}
+                    >
+                      <RotateCcw size={16} className={textColor} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Reset View</TooltipContent>
+                </Tooltip>
+                <div className={`w-px h-4 ${borderColor} my-auto mx-1`} />
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={handleFullScreen}
+                      className={`h-8 w-8 ${buttonHoverBg}`}
+                    >
+                      <Maximize2 size={16} className={textColor} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {isFullScreen ? "Exit Full Screen" : "Full Screen"}
+                  </TooltipContent>
+                </Tooltip>
               </div>
+
+              {/* Force Graph */}
               <ForceGraph3D
                 ref={fgRef}
                 graphData={graphData}
                 nodeLabel="name"
-                nodeAutoColorBy="type"
+                backgroundColor={theme === "dark" ? "#000000" : "#f8fafc"}
                 linkOpacity={0.5}
                 linkDirectionalParticles={2}
+                linkDirectionalParticleWidth={1.5}
+                nodeRelSize={6}
                 onNodeClick={handleNodeClick}
+                linkWidth={1}
                 nodeThreeObject={(node) => {
                   const group = new THREE.Group();
                   const sphere = new THREE.Mesh(
                     new THREE.SphereGeometry(node.size),
                     new THREE.MeshStandardMaterial({
                       color: getNodeColor(node),
+                      emissive: getNodeColor(node),
+                      emissiveIntensity: 0.2,
+                      roughness: 0.5,
+                      metalness: 0.3,
                     })
                   );
                   group.add(sphere);
 
                   const sprite = new SpriteText(node.name);
-                  sprite.color = "white";
+                  sprite.color = theme === "dark" ? "white" : "black";
                   sprite.textHeight = 4;
                   sprite.position.y = node.size + 2;
                   group.add(sprite);
@@ -391,35 +463,97 @@ console.log(graphData)
                 height={dimensions.height}
               />
 
+              {/* Loading Overlay */}
+              {loading && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/50 z-50">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-3"></div>
+                    <div className={textColor}>Loading repository...</div>
+                  </div>
+                </div>
+              )}
+
+              {/* Error Message */}
+              {error && (
+                <div className="absolute top-4 right-4 max-w-xs bg-red-500/90 text-white backdrop-blur-xl p-3 rounded-lg border border-red-400 z-50">
+                  <div className="flex items-center justify-between gap-3 mb-1">
+                    <h3 className="text-sm font-medium">Error</h3>
+                    <Button
+                      onClick={() => setError(null)}
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6 hover:bg-red-600"
+                    >
+                      <X size={14} className="text-white" />
+                    </Button>
+                  </div>
+                  <p className="text-xs">{error}</p>
+                </div>
+              )}
+
               {/* Node Info Panel */}
               {selectedNode && (
-                <div className="absolute top-4 right-4 bg-[#1F1F1F]/90 backdrop-blur-xl p-4 rounded-lg shadow-lg border border-[#2D2D2D]">
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-lg font-bold text-white">
+                <div
+                  className={`absolute top-4 right-4 ${panelBg} backdrop-blur-xl p-3 rounded-lg border ${borderColor}`}
+                >
+                  <div className="flex items-center justify-between gap-3 mb-1">
+                    <h3 className={`text-sm font-medium ${textColor}`}>
                       {selectedNode.name}
                     </h3>
                     <Button
                       onClick={() => setSelectedNode(null)}
                       variant="ghost"
                       size="icon"
-                      className="text-gray-400 hover:text-white"
+                      className={`h-6 w-6 ${buttonHoverBg}`}
                     >
-                      <X size={18} />
+                      <X size={14} className={textColor} />
                     </Button>
                   </div>
-                  <p className="text-gray-400">Type: {selectedNode.type}</p>
+                  <p
+                    className={`text-xs ${
+                      theme === "dark" ? "text-neutral-400" : "text-neutral-600"
+                    }`}
+                  >
+                    Type: {selectedNode.type}
+                  </p>
                 </div>
               )}
-            </Card>
-          </div>
-          {!isFullScreen && (
-            <div className="lg:w-1/2">
-              <ChatInterface />
+
+              {/* Empty State */}
+              {graphData.nodes.length <= 1 && !loading && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="text-center max-w-md p-6">
+                    <Github className="h-14 w-14 text-blue-500 mb-6 mx-auto opacity-50" />
+                    <h2 className={`text-xl font-semibold mb-2 ${textColor}`}>
+                      No Repository Loaded
+                    </h2>
+                    <p
+                      className={`${
+                        theme === "dark"
+                          ? "text-neutral-400"
+                          : "text-neutral-600"
+                      } mb-6`}
+                    >
+                      Enter a GitHub repository URL below to visualize its
+                      structure in 3D.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
+
+            {/* Chat Interface */}
+
+            {/* Chat Interface */}
+            <div className="w-5/12 flex flex-col h-full z-0 absolute right-0 overflow-hidden">
+              <Card className={`flex-1 h-screen border-l ${borderColor}`}>
+                <ChatInterface theme={theme} />
+              </Card>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </TooltipProvider>
   );
 };
 

@@ -1,4 +1,4 @@
-import { File, Folder, Tree } from "@/components/file-tree"
+import { File, Folder, Tree } from "../../components/file-tree"
 import { X } from "lucide-react"
 
 const ELEMENTS = [
