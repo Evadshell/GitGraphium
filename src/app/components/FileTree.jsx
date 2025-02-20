@@ -303,7 +303,7 @@ const FileTree = () => {
       <div className={`h-screen w-screen ${bgColor} flex flex-col overflow-hidden`}>
         {/* Elegant Navbar */}
         <nav
-          className={`h-16 border-b ${borderColor} ${bgColor} flex items-center px-6 shrink-0`}
+          className={`h-16 border-b ${borderColor} ${bgColor} flex items-center px-6 shrink-0 `} style={{width:"55%"}}  
         >
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-3">
@@ -545,12 +545,13 @@ const FileTree = () => {
             {/* Chat Interface */}
 
             {/* Chat Interface */}
-            <div className="w-5/12 flex flex-col h-full z-0 absolute right-0 overflow-hidden">
+            <div className="w-5/12 flex flex-col h-full z-0 absolute right-0 overflow-hidden top-0">
               <Card className={`flex-1 h-screen border-l ${borderColor}`}>
                 <ChatInterface theme={theme} />
               </Card>
             </div>
           </div>
+          
         </div>
       </div>
     </TooltipProvider>
