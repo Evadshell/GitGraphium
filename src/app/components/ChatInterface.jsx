@@ -1,11 +1,11 @@
 "use client"
 import { useState, useRef, useEffect } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Card } from "../../components/ui/card";
+import { Button } from "../../components/ui/button";
+import { Input } from "../../components/ui/input";
 import { Send, Bot, User, AlertCircle, Loader2 } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { ScrollArea } from "../../components/ui/scroll-area";
+import { Alert, AlertDescription } from "../../components/ui/alert";
 
 const ChatInterface = ({ theme = 'dark' }) => {
   const [messages, setMessages] = useState([
@@ -70,7 +70,7 @@ const ChatInterface = ({ theme = 'dark' }) => {
 
       const assistantMessage = {
         role: "assistant",
-        content: data.Assistant.response || "I couldn't process that request. Please try again.",
+        content: data.Assistant.response || data.Assistant.content || "I couldn't process that request. Please try again.",
         timestamp: new Date().toISOString(),
         codeContext: data.codeContext
       };
